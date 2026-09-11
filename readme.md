@@ -169,4 +169,15 @@ You can tweak these values in `chatbot.py` to tune performance:
 |----------|----------|-------------|
 | `MISTRAL_API_KEY` | ✅ Yes | Your Mistral API key from console.mistral.ai |
 
+### Streamlit Cloud
+
+Add the key in the app dashboard under **Manage app → Settings → Secrets**:
+
+```toml
+MISTRAL_API_KEY = "your_mistral_api_key"
+```
+
+Do not commit `.env` files or paste API keys into source code. If a key is
+exposed, revoke it and create a replacement before updating the deployment.
+
 ---

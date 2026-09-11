@@ -18,7 +18,19 @@ from langchain_core.runnables import RunnablePassthrough
 
 # ── Load API key ───────────────────────────────
 load_dotenv()
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+
+
+def get_mistral_api_key():
+    """Read the key from Streamlit Cloud secrets or local environment variables."""
+    try:
+        cloud_key = st.secrets.get("MISTRAL_API_KEY")
+    except FileNotFoundError:
+        cloud_key = None
+
+    return cloud_key or os.getenv("MISTRAL_API_KEY")
+
+
+MISTRAL_API_KEY = get_mistral_api_key()
 
 # ── Page config ────────────────────────────────
 st.set_page_config(page_title="CV Chatbot", page_icon="🤖", layout="centered")
@@ -45,6 +57,12 @@ def load_cv(uploaded_file):
 
 def build_chain(documents):
     """Takes CV documents and returns a ready-to-use chain."""
+
+    if not MISTRAL_API_KEY:
+        raise RuntimeError(
+            "MISTRAL_API_KEY is not configured. Add it to Streamlit Cloud "
+            "Settings > Secrets or to the local .env file."
+        )
 
     # Split into chunks
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
@@ -138,7 +156,24 @@ else:
         # Get and show bot answer
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
-                answer = st.session_state.chain.invoke(question)
+                try:
+                    answer = st.session_state.chain.invoke(question)
+                except Exception as error:
+                    response = getattr(error, "response", None)
+                    status_code = getattr(response, "status_code", None)
+                    if status_code == 401:
+                        st.error(
+                            "Mistral rejected the API key. Rotate the exposed key "
+                            "and update Streamlit Cloud Secrets."
+                        )
+                    elif status_code == 429:
+                        st.error("Mistral rate limit or quota reached. Try again later.")
+                    else:
+                        st.error(
+                            "Mistral could not answer this request. Verify the "
+                            "deployment secret and model availability."
+                        )
+                    st.stop()
             st.markdown(answer)
 
         st.session_state.messages.append({"role": "assistant", "content": answer})
